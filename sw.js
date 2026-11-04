@@ -1,4 +1,4 @@
-﻿const CACHE = 'taiju-v14';
+﻿const CACHE = 'taiju-v15';
 const FILES = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => {
   self.skipWaiting();

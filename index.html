@@ -256,10 +256,10 @@ function drawChart() {
     borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 0, yAxisID: 'y'
   });
   const big = $('chartCard').classList.contains('full');
-  // 1週間・1ヶ月は1kg刻み、それより長い期間は5kg刻み
+  // 1週間・1ヶ月は0.5kg刻み、それより長い期間は5kg刻み
   const short = range && range <= 30;
-  const kgStep = short ? 1 : 5, pctStep = short ? 1 : 2;
-  // 目盛りの上下を刻み幅にそろえて自分で決める（自動に任せると範囲が広がりすぎるため）
+  const kgStep = short ? 0.5 : 5, pctStep = short ? 1 : 2;
+  // 目盛りの上下を刻み幅にそろえて自分で決める（自動だと範囲が広がりすぎるため）
   const bounds = (keys, step, extra = []) => {
     const v = rows.flatMap(r => keys.map(k => r[k])).filter(x => x != null).concat(extra);
     if (!v.length) return {};
@@ -285,7 +285,7 @@ function drawChart() {
       },
       scales: {
         x: { grid: { display: false }, ticks: { color: tick, maxTicksLimit: big ? 14 : 8 } },
-        y: { grid: { color: grid }, ...yW, ticks: { color: css('--w'), stepSize: kgStep, precision: 0, callback: v => Math.round(v) + 'kg' } },
+        y: { grid: { color: grid }, ...yW, ticks: { color: css('--w'), stepSize: kgStep, callback: v => (kgStep < 1 ? v.toFixed(1) : Math.round(v)) + 'kg' } },
         y2: { display: false, position: 'left', grid: { drawOnChartArea: false }, ...yM, ticks: { color: css('--m'), stepSize: kgStep, precision: 0, callback: v => Math.round(v) + 'kg' } },
         y1: { position: 'right', grid: { drawOnChartArea: false }, ...yF, ticks: { color: css('--f'), stepSize: pctStep, precision: 0, callback: v => Math.round(v) + '%' } }
       }
