@@ -47,7 +47,15 @@
   .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
   .tabs button { background: transparent; color: var(--sub); border: 1px solid var(--line); font-size: 13px; padding: 6px 12px; font-weight: 500; }
   .tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
-  .chart-box { position: relative; height: 320px; }
+  .chart-box { position: relative; height: 130px; }
+  .chart-box.last { height: 155px; }
+  .mini { margin-bottom: 8px; }
+  .mini-head { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .chart-title { display: flex; justify-content: space-between; align-items: flex-start; }
+  #chartCard.full { position: fixed; inset: 0; z-index: 100; margin: 0; border-radius: 0; overflow-y: auto;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
+  #chartCard.full .chart-box { height: calc((100dvh - 190px) / 3); min-height: 120px; }
+  body.noscroll { overflow: hidden; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th, td { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: right; }
   th:first-child, td:first-child { text-align: left; }
@@ -79,8 +87,8 @@
     </form>
   </div>
 
-  <div class="card">
-    <h2>グラフ</h2>
+  <div class="card" id="chartCard">
+    <div class="chart-title"><h2>グラフ</h2><button class="ghost" id="expandBtn">⛶ 拡大</button></div>
     <div class="tabs" id="rangeTabs">
       <button data-r="7">1週間</button>
       <button data-r="30" class="on">1ヶ月</button>
@@ -88,7 +96,9 @@
       <button data-r="365">1年</button>
       <button data-r="0">全期間</button>
     </div>
-    <div class="chart-box"><canvas id="chart"></canvas></div>
+    <div class="mini"><div class="mini-head"><span style="color:var(--w)">● 体重</span><b id="now-weight"></b></div><div class="chart-box"><canvas id="chart-weight"></canvas></div></div>
+    <div class="mini"><div class="mini-head"><span style="color:var(--f)">● 体脂肪率</span><b id="now-fat"></b></div><div class="chart-box"><canvas id="chart-fat"></canvas></div></div>
+    <div class="mini"><div class="mini-head"><span style="color:var(--m)">● 筋肉量</span><b id="now-muscle"></b></div><div class="chart-box last"><canvas id="chart-muscle"></canvas></div></div>
     <div class="legend-note">🏃 = 運動した日</div>
   </div>
 
@@ -120,7 +130,7 @@
 <script>
 const KEY = 'bodyLog.v1';
 let data = load();
-let metric = 'all', range = 30, chart;
+let range = 30, charts = [];
 
 function load() {
   try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; }
@@ -219,7 +229,7 @@ const exercisePlugin = {
       ctx.fillStyle = 'rgba(46,158,106,0.10)';
       const w = Math.max(4, Math.min(20, chartArea.width / rows.length * 0.8));
       ctx.fillRect(px - w / 2, chartArea.top, w, chartArea.height);
-      ctx.fillText('🏃', px, chartArea.top + 18);
+      if (c.$icons) ctx.fillText('🏃', px, chartArea.top + 18);
     });
     ctx.restore();
   }
@@ -233,43 +243,48 @@ function drawChart() {
     rows = rows.filter(r => r.date >= s);
   }
   const labels = rows.map(r => r.date.slice(5).replace('-', '/'));
-  const defs = { weight: ['体重 (kg)', '--w', 'y'], fat: ['体脂肪率 (%)', '--f', 'y1'], muscle: ['筋肉量 (kg)', '--m', 'y'] };
-  const keys = metric === 'all' ? ['weight', 'fat', 'muscle'] : [metric];
-  const datasets = keys.map(k => ({
-    label: defs[k][0], data: rows.map(r => r[k]), borderColor: css(defs[k][1]), backgroundColor: css(defs[k][1]),
-    tension: 0.3, spanGaps: true, pointRadius: rows.length > 60 ? 0 : 3, pointHoverRadius: 5, borderWidth: 2,
-    yAxisID: metric === 'all' ? defs[k][2] : 'y'
-  }));
-  if (settings.goal && rows.length) datasets.push({
-    label: '目標体重', data: rows.map(() => settings.goal), borderColor: css('--w'), borderDash: [6, 4],
-    borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 0, yAxisID: 'y'
-  });
   const grid = css('--line'), tick = css('--sub');
-  const scales = {
-    x: { grid: { display: false }, ticks: { color: tick, maxTicksLimit: 10 } },
-    y: { grid: { color: grid }, ticks: { color: tick }, grace: '5%', title: { display: metric === 'all', text: 'kg', color: tick } }
-  };
-  if (metric === 'all') scales.y1 = { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: tick }, grace: '5%', title: { display: true, text: '%', color: tick } };
-
-  if (chart) chart.destroy();
-  chart = new Chart($('chart'), {
-    type: 'line', data: { labels, datasets }, plugins: [exercisePlugin],
-    options: {
-      maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
-      layout: { padding: { top: 4 } },
-      plugins: {
-        legend: { display: metric === 'all', labels: { color: tick, usePointStyle: true } },
-        tooltip: { callbacks: { afterBody: items => {
-          const r = rows[items[0].dataIndex];
-          return r.exercise ? ['🏃 運動した' + (r.minutes ? ` ${r.minutes}分` : '') + (r.memo ? '：' + r.memo : '')] : [];
-        } } }
-      },
-      scales
-    }
+  const defs = [['weight', '体重', 'kg', '--w'], ['fat', '体脂肪率', '%', '--f'], ['muscle', '筋肉量', 'kg', '--m']];
+  charts.forEach(c => c.destroy()); charts = [];
+  defs.forEach(([k, name, unit, color], idx) => {
+    const col = css(color);
+    const datasets = [{
+      label: name, data: rows.map(r => r[k]), borderColor: col, backgroundColor: col + '22', fill: 'origin',
+      tension: 0.3, spanGaps: true, pointRadius: rows.length > 60 ? 0 : 3, pointHoverRadius: 5, borderWidth: 2.5
+    }];
+    if (k === 'weight' && settings.goal && rows.length) datasets.push({
+      label: '目標', data: rows.map(() => settings.goal), borderColor: col, borderDash: [6, 4],
+      borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 0, fill: false
+    });
+    const vals = rows.map(r => r[k]).filter(v => v != null).concat(k === 'weight' && settings.goal ? [settings.goal] : []);
+    const pad = vals.length ? Math.max(0.5, (Math.max(...vals) - Math.min(...vals)) * 0.2) : 1;
+    const c = new Chart($('chart-' + k), {
+      type: 'line', data: { labels, datasets }, plugins: [exercisePlugin],
+      options: {
+        maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: { filter: i => i.datasetIndex === 0, callbacks: {
+            label: i => `${name} ${i.raw.toFixed(1)}${unit}`,
+            afterBody: items => {
+              const r = rows[items[0]?.dataIndex]; if (!r || !r.exercise) return [];
+              return ['🏃 運動した' + (r.minutes ? ` ${r.minutes}分` : '') + (r.memo ? '：' + r.memo : '')];
+            } } }
+        },
+        scales: {
+          x: { display: idx === defs.length - 1, grid: { display: false }, ticks: { color: tick, maxTicksLimit: 8 } },
+          y: { grid: { color: grid }, ticks: { color: tick, maxTicksLimit: 4, callback: v => v.toFixed(1) },
+            min: vals.length ? Math.floor((Math.min(...vals) - pad) * 2) / 2 : undefined,
+            max: vals.length ? Math.ceil((Math.max(...vals) + pad) * 2) / 2 : undefined }
+        }
+      }
+    });
+    c.$rows = rows; c.$icons = idx === 0; c.update('none');
+    charts.push(c);
+    const last = vals.length ? [...rows].reverse().find(r => r[k] != null)[k] : null;
+    $('now-' + k).textContent = last == null ? '' : last.toFixed(1) + unit;
   });
-  chart.$rows = rows; chart.update('none');
 }
-
 $('exportBtn').addEventListener('click', () => {
   const lines = ['date,weight,fat,muscle,exercise,minutes,memo', ...sorted().map(r =>
     [r.date, r.weight ?? '', r.fat ?? '', r.muscle ?? '', r.exercise ? 1 : 0, r.minutes ?? '', '"' + (r.memo || '').replace(/"/g, '""') + '"'].join(','))];
@@ -298,6 +313,13 @@ $('settingsForm').addEventListener('submit', e => {
   try { localStorage.setItem(SKEY, JSON.stringify(settings)); } catch {}
   render();
 });
+$('expandBtn').addEventListener('click', () => {
+  const on = $('chartCard').classList.toggle('full');
+  document.body.classList.toggle('noscroll', on);
+  $('expandBtn').textContent = on ? '✕ 閉じる' : '⛶ 拡大';
+  charts.forEach(c => c.resize());
+});
+window.addEventListener('resize', () => charts.forEach(c => c.resize()));
 function render() { renderStats(); renderList(); drawChart(); }
 render();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
