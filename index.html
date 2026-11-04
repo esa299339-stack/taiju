@@ -73,6 +73,7 @@
       <label>体脂肪率 (%)<input type="number" id="fat" step="0.1" min="1" max="80"></label>
       <label>筋肉量 (kg)<input type="number" id="muscle" step="0.1" min="5" max="150"></label>
       <label class="ex"><input type="checkbox" id="exercise"> 🏃 運動した</label>
+      <label>運動時間 (分)<input type="number" id="minutes" step="1" min="0" max="1440"></label>
       <label>運動メモ<input type="text" id="memo" placeholder="例: ジョギング30分"></label>
       <button type="submit">保存</button>
     </form>
@@ -137,14 +138,15 @@ $('date').addEventListener('change', fillForm);
 function fillForm() {
   const r = data[$('date').value] || {};
   $('weight').value = r.weight ?? ''; $('fat').value = r.fat ?? ''; $('muscle').value = r.muscle ?? '';
-  $('exercise').checked = !!r.exercise; $('memo').value = r.memo ?? '';
+  $('exercise').checked = !!r.exercise; $('minutes').value = r.minutes ?? ''; $('memo').value = r.memo ?? '';
 }
 fillForm();
 
 $('form').addEventListener('submit', e => {
   e.preventDefault();
   const rec = { weight: num($('weight').value), fat: num($('fat').value), muscle: num($('muscle').value),
-    exercise: $('exercise').checked, memo: $('memo').value.trim() };
+    exercise: $('exercise').checked, minutes: num($('minutes').value), memo: $('memo').value.trim() };
+  if (rec.minutes) rec.exercise = true;
   if (rec.weight == null && rec.fat == null && rec.muscle == null && !rec.exercise) {
     alert('何か1つは入力してください'); return;
   }
@@ -165,8 +167,12 @@ function renderStats() {
   const rows = sorted(), items = [];
   const since = new Date(); since.setDate(since.getDate() - 29);
   const s = since.toISOString().slice(0, 10);
-  const exCount = rows.filter(r => r.exercise && r.date >= s).length;
-  items.push(`<div class="stat"><div class="label">🏃 運動 (直近30日)</div><div class="val">${exCount}<small style="font-size:14px">日</small></div></div>`);
+  const recent = rows.filter(r => r.exercise && r.date >= s);
+  const total = recent.reduce((a, r) => a + (r.minutes || 0), 0);
+  const small = t => `<small style="font-size:14px">${t}</small>`;
+  const time = total >= 60 ? `${Math.floor(total / 60)}${small('時間')}${total % 60 ? (total % 60) + small('分') : ''}` : total + small('分');
+  items.push(`<div class="stat"><div class="label">🏃 運動日数 (直近30日)</div><div class="val">${recent.length}${small('日')}</div></div>`);
+  items.push(`<div class="stat"><div class="label">⏱ 運動時間 (直近30日)</div><div class="val">${time}</div></div>`);
   $('stats').innerHTML = items.join('');
 }
 
@@ -174,7 +180,7 @@ function renderList() {
   const rows = sorted().reverse();
   $('list').innerHTML = rows.length ? rows.map(r => `<tr>
     <td>${r.date}</td><td>${fmt(r.weight, 'kg')}</td><td>${fmt(r.fat, '%')}</td><td>${fmt(r.muscle, 'kg')}</td>
-    <td class="memo">${r.exercise ? '🏃 ' : ''}${escapeHtml(r.memo || '')}</td>
+    <td class="memo">${r.exercise ? '🏃 ' : ''}${r.minutes ? r.minutes + '分 ' : ''}${escapeHtml(r.memo || '')}</td>
     <td><button class="del" data-d="${r.date}" title="削除">✕</button></td></tr>`).join('')
     : '<tr><td colspan="6" style="text-align:center;color:var(--sub)">まだ記録がありません</td></tr>';
 }
@@ -235,7 +241,7 @@ function drawChart() {
         legend: { display: metric === 'all', labels: { color: tick, usePointStyle: true } },
         tooltip: { callbacks: { afterBody: items => {
           const r = rows[items[0].dataIndex];
-          return r.exercise ? ['🏃 運動した' + (r.memo ? '：' + r.memo : '')] : [];
+          return r.exercise ? ['🏃 運動した' + (r.minutes ? ` ${r.minutes}分` : '') + (r.memo ? '：' + r.memo : '')] : [];
         } } }
       },
       scales
@@ -245,8 +251,8 @@ function drawChart() {
 }
 
 $('exportBtn').addEventListener('click', () => {
-  const lines = ['date,weight,fat,muscle,exercise,memo', ...sorted().map(r =>
-    [r.date, r.weight ?? '', r.fat ?? '', r.muscle ?? '', r.exercise ? 1 : 0, '"' + (r.memo || '').replace(/"/g, '""') + '"'].join(','))];
+  const lines = ['date,weight,fat,muscle,exercise,minutes,memo', ...sorted().map(r =>
+    [r.date, r.weight ?? '', r.fat ?? '', r.muscle ?? '', r.exercise ? 1 : 0, r.minutes ?? '', '"' + (r.memo || '').replace(/"/g, '""') + '"'].join(','))];
   const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `体重記録_${today()}.csv`; a.click();
 });
@@ -256,9 +262,10 @@ $('importFile').addEventListener('change', async e => {
   const text = (await f.text()).replace(/^﻿/, '');
   let n = 0;
   text.split(/\r?\n/).slice(1).forEach(line => {
-    const m = line.match(/^(\d{4}-\d{2}-\d{2}),([^,]*),([^,]*),([^,]*),([^,]*),"?(.*?)"?$/);
+    const m = line.match(/^(\d{4}-\d{2}-\d{2}),([^,]*),([^,]*),([^,]*),([^,]*),(?:(\d*),(?="))?"?(.*?)"?$/);
     if (!m) return;
-    data[m[1]] = { weight: num(m[2]), fat: num(m[3]), muscle: num(m[4]), exercise: m[5] === '1', memo: m[6].replace(/""/g, '"') }; n++;
+    data[m[1]] = { weight: num(m[2]), fat: num(m[3]), muscle: num(m[4]), exercise: m[5] === '1',
+      minutes: num(m[6]), memo: m[7].replace(/""/g, '"') }; n++;
   });
   save(); render(); alert(`${n}件読み込みました`); e.target.value = '';
 });
