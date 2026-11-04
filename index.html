@@ -47,14 +47,11 @@
   .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
   .tabs button { background: transparent; color: var(--sub); border: 1px solid var(--line); font-size: 13px; padding: 6px 12px; font-weight: 500; }
   .tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
-  .chart-box { position: relative; height: 130px; }
-  .chart-box.last { height: 155px; }
-  .mini { margin-bottom: 8px; }
-  .mini-head { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .chart-box { position: relative; height: 340px; }
   .chart-title { display: flex; justify-content: space-between; align-items: flex-start; }
   #chartCard.full { position: fixed; inset: 0; z-index: 100; margin: 0; border-radius: 0; overflow-y: auto;
     padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
-  #chartCard.full .chart-box { height: calc((100dvh - 190px) / 3); min-height: 120px; }
+  #chartCard.full .chart-box { height: calc(100dvh - 160px); min-height: 240px; }
   body.noscroll { overflow: hidden; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th, td { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: right; }
@@ -96,9 +93,7 @@
       <button data-r="365">1年</button>
       <button data-r="0">全期間</button>
     </div>
-    <div class="mini"><div class="mini-head"><span style="color:var(--w)">● 体重</span><b id="now-weight"></b></div><div class="chart-box"><canvas id="chart-weight"></canvas></div></div>
-    <div class="mini"><div class="mini-head"><span style="color:var(--f)">● 体脂肪率</span><b id="now-fat"></b></div><div class="chart-box"><canvas id="chart-fat"></canvas></div></div>
-    <div class="mini"><div class="mini-head"><span style="color:var(--m)">● 筋肉量</span><b id="now-muscle"></b></div><div class="chart-box last"><canvas id="chart-muscle"></canvas></div></div>
+    <div class="chart-box"><canvas id="chart"></canvas></div>
     <div class="legend-note">🏃 = 運動した日</div>
   </div>
 
@@ -216,7 +211,7 @@ $('list').addEventListener('click', e => {
   if (d && confirm(`${d} の記録を削除しますか？`)) { delete data[d]; save(); render(); }
 });
 
-// 運動アイコンを描くプラグイン
+// 運動した日のアイコンと帯を描くプラグイン
 const exercisePlugin = {
   id: 'exercise',
   afterDatasetsDraw(c) {
@@ -244,46 +239,39 @@ function drawChart() {
   }
   const labels = rows.map(r => r.date.slice(5).replace('-', '/'));
   const grid = css('--line'), tick = css('--sub');
-  const defs = [['weight', '体重', 'kg', '--w'], ['fat', '体脂肪率', '%', '--f'], ['muscle', '筋肉量', 'kg', '--m']];
-  charts.forEach(c => c.destroy()); charts = [];
-  defs.forEach(([k, name, unit, color], idx) => {
-    const col = css(color);
-    const datasets = [{
-      label: name, data: rows.map(r => r[k]), borderColor: col, backgroundColor: col + '22', fill: 'origin',
-      tension: 0.3, spanGaps: true, pointRadius: rows.length > 60 ? 0 : 3, pointHoverRadius: 5, borderWidth: 2.5
-    }];
-    if (k === 'weight' && settings.goal && rows.length) datasets.push({
-      label: '目標', data: rows.map(() => settings.goal), borderColor: col, borderDash: [6, 4],
-      borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 0, fill: false
-    });
-    const vals = rows.map(r => r[k]).filter(v => v != null).concat(k === 'weight' && settings.goal ? [settings.goal] : []);
-    const pad = vals.length ? Math.max(0.5, (Math.max(...vals) - Math.min(...vals)) * 0.2) : 1;
-    const c = new Chart($('chart-' + k), {
-      type: 'line', data: { labels, datasets }, plugins: [exercisePlugin],
-      options: {
-        maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { display: false },
-          tooltip: { filter: i => i.datasetIndex === 0, callbacks: {
-            label: i => `${name} ${i.raw.toFixed(1)}${unit}`,
-            afterBody: items => {
-              const r = rows[items[0]?.dataIndex]; if (!r || !r.exercise) return [];
-              return ['🏃 運動した' + (r.minutes ? ` ${r.minutes}分` : '') + (r.memo ? '：' + r.memo : '')];
-            } } }
-        },
-        scales: {
-          x: { display: idx === defs.length - 1, grid: { display: false }, ticks: { color: tick, maxTicksLimit: 8 } },
-          y: { grid: { color: grid }, ticks: { color: tick, maxTicksLimit: 4, callback: v => v.toFixed(1) },
-            min: vals.length ? Math.floor((Math.min(...vals) - pad) * 2) / 2 : undefined,
-            max: vals.length ? Math.ceil((Math.max(...vals) + pad) * 2) / 2 : undefined }
-        }
-      }
-    });
-    c.$rows = rows; c.$icons = idx === 0; c.update('none');
-    charts.push(c);
-    const last = vals.length ? [...rows].reverse().find(r => r[k] != null)[k] : null;
-    $('now-' + k).textContent = last == null ? '' : last.toFixed(1) + unit;
+  const defs = [['weight', '体重', 'kg', '--w', 'y'], ['fat', '体脂肪率', '%', '--f', 'y1'], ['muscle', '筋肉量', 'kg', '--m', 'y']];
+  const datasets = defs.map(([k, name, unit, color, axis]) => ({
+    label: name, data: rows.map(r => r[k]), borderColor: css(color), backgroundColor: css(color), unit,
+    tension: 0.3, spanGaps: true, pointRadius: rows.length > 60 ? 0 : 3, pointHoverRadius: 6, borderWidth: 2.5, yAxisID: axis
+  }));
+  if (settings.goal && rows.length) datasets.push({
+    label: '目標体重', data: rows.map(() => settings.goal), borderColor: css('--w'), backgroundColor: css('--w'), unit: 'kg',
+    borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 0, yAxisID: 'y'
   });
+  const big = $('chartCard').classList.contains('full');
+  charts.forEach(c => c.destroy());
+  const c = new Chart($('chart'), {
+    type: 'line', data: { labels, datasets }, plugins: [exercisePlugin],
+    options: {
+      maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: tick, usePointStyle: true, boxHeight: 8, font: { size: big ? 14 : 12 } } },
+        tooltip: { callbacks: {
+          label: i => i.raw == null ? null : `${i.dataset.label} ${i.raw.toFixed(1)}${i.dataset.unit}`,
+          afterBody: items => {
+            const r = rows[items[0]?.dataIndex]; if (!r || !r.exercise) return [];
+            return ['🏃 運動した' + (r.minutes ? ` ${r.minutes}分` : '') + (r.memo ? '：' + r.memo : '')];
+          } } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: tick, maxTicksLimit: big ? 14 : 8 } },
+        y: { grid: { color: grid }, ticks: { color: tick }, grace: '8%', title: { display: true, text: 'kg（体重・筋肉量）', color: tick } },
+        y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: css('--f') }, grace: '8%', title: { display: true, text: '%（体脂肪率）', color: css('--f') } }
+      }
+    }
+  });
+  c.$rows = rows; c.$icons = true; c.update('none');
+  charts = [c];
 }
 $('exportBtn').addEventListener('click', () => {
   const lines = ['date,weight,fat,muscle,exercise,minutes,memo', ...sorted().map(r =>
@@ -317,7 +305,7 @@ $('expandBtn').addEventListener('click', () => {
   const on = $('chartCard').classList.toggle('full');
   document.body.classList.toggle('noscroll', on);
   $('expandBtn').textContent = on ? '✕ 閉じる' : '⛶ 拡大';
-  charts.forEach(c => c.resize());
+  drawChart();
 });
 window.addEventListener('resize', () => charts.forEach(c => c.resize()));
 function render() { renderStats(); renderList(); drawChart(); }
