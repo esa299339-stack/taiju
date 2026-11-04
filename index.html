@@ -81,12 +81,6 @@
 
   <div class="card">
     <h2>グラフ</h2>
-    <div class="tabs" id="metricTabs">
-      <button data-m="weight" class="on">体重</button>
-      <button data-m="fat">体脂肪率</button>
-      <button data-m="muscle">筋肉量</button>
-      <button data-m="all">すべて</button>
-    </div>
     <div class="tabs" id="rangeTabs">
       <button data-r="7">1週間</button>
       <button data-r="30" class="on">1ヶ月</button>
@@ -117,7 +111,7 @@
 <script>
 const KEY = 'bodyLog.v1';
 let data = load();
-let metric = 'weight', range = 30, chart;
+let metric = 'all', range = 30, chart;
 
 function load() {
   try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; }
@@ -160,7 +154,6 @@ function setupTabs(id, attr, cb) {
     cb(b.dataset[attr]); drawChart();
   });
 }
-setupTabs('metricTabs', 'm', v => metric = v);
 setupTabs('rangeTabs', 'r', v => range = Number(v));
 
 function renderStats() {
