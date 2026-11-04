@@ -106,6 +106,15 @@
       <input type="file" id="importFile" accept=".csv" hidden>
     </div>
   </div>
+
+  <div class="card">
+    <h2>⚙ 設定</h2>
+    <form id="settingsForm">
+      <label>身長 (cm)<input type="number" id="height" step="0.1" min="100" max="250"></label>
+      <label>目標体重 (kg)<input type="number" id="goal" step="0.1" min="20" max="300"></label>
+      <button type="submit">設定を保存</button>
+    </form>
+  </div>
 </div>
 
 <script>
@@ -117,6 +126,8 @@ function load() {
   try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; }
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {} }
+const SKEY = 'bodyLog.settings';
+let settings = (() => { try { return JSON.parse(localStorage.getItem(SKEY)) || {}; } catch { return {}; } })();
 function today() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().slice(0, 10);
@@ -158,6 +169,18 @@ setupTabs('rangeTabs', 'r', v => range = Number(v));
 
 function renderStats() {
   const rows = sorted(), items = [];
+  const lastW = [...rows].reverse().find(r => r.weight != null)?.weight;
+  if (settings.height) {
+    const h = settings.height / 100;
+    const bmi = lastW ? lastW / (h * h) : null;
+    const judge = bmi == null ? '' : bmi < 18.5 ? '低体重' : bmi < 25 ? '普通体重' : bmi < 30 ? '肥満(1度)' : '肥満(2度以上)';
+    items.push(`<div class="stat"><div class="label">BMI</div><div class="val">${bmi ? bmi.toFixed(1) : '–'}</div><div class="diff">${judge}${judge ? '・' : ''}標準体重 ${(22 * h * h).toFixed(1)}kg</div></div>`);
+  }
+  if (settings.goal) {
+    const left = lastW ? lastW - settings.goal : null;
+    const txt = left == null ? '–' : Math.abs(left) < 0.05 ? '達成！' : (left > 0 ? 'あと ' : '') + Math.abs(left).toFixed(1) + '<small style="font-size:14px">kg</small>' + (left < 0 ? ' 下回り' : '');
+    items.push(`<div class="stat"><div class="label">🎯 目標 ${settings.goal.toFixed(1)}kg</div><div class="val">${txt}</div></div>`);
+  }
   const since = new Date(); since.setDate(since.getDate() - 29);
   const s = since.toISOString().slice(0, 10);
   const recent = rows.filter(r => r.exercise && r.date >= s);
@@ -217,6 +240,10 @@ function drawChart() {
     tension: 0.3, spanGaps: true, pointRadius: rows.length > 60 ? 0 : 3, pointHoverRadius: 5, borderWidth: 2,
     yAxisID: metric === 'all' ? defs[k][2] : 'y'
   }));
+  if (settings.goal && rows.length) datasets.push({
+    label: '目標体重', data: rows.map(() => settings.goal), borderColor: css('--w'), borderDash: [6, 4],
+    borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 0, yAxisID: 'y'
+  });
   const grid = css('--line'), tick = css('--sub');
   const scales = {
     x: { grid: { display: false }, ticks: { color: tick, maxTicksLimit: 10 } },
@@ -264,6 +291,13 @@ $('importFile').addEventListener('change', async e => {
 });
 
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawChart);
+$('height').value = settings.height ?? ''; $('goal').value = settings.goal ?? '';
+$('settingsForm').addEventListener('submit', e => {
+  e.preventDefault();
+  settings = { height: num($('height').value), goal: num($('goal').value) };
+  try { localStorage.setItem(SKEY, JSON.stringify(settings)); } catch {}
+  render();
+});
 function render() { renderStats(); renderList(); drawChart(); }
 render();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
