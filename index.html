@@ -162,14 +162,7 @@ setupTabs('metricTabs', 'm', v => metric = v);
 setupTabs('rangeTabs', 'r', v => range = Number(v));
 
 function renderStats() {
-  const rows = sorted();
-  const last = key => { for (let i = rows.length - 1; i >= 0; i--) if (rows[i][key] != null) return i; return -1; };
-  const items = [['weight', '体重', 'kg'], ['fat', '体脂肪率', '%'], ['muscle', '筋肉量', 'kg']].map(([k, l, u]) => {
-    const i = last(k); if (i < 0) return `<div class="stat"><div class="label">${l}</div><div class="val">–</div></div>`;
-    let prev = null; for (let j = i - 1; j >= 0; j--) if (rows[j][k] != null) { prev = rows[j][k]; break; }
-    const d = prev == null ? '' : `前回比 ${(rows[i][k] - prev >= 0 ? '+' : '')}${(rows[i][k] - prev).toFixed(1)}${u}`;
-    return `<div class="stat"><div class="label">${l}</div><div class="val">${rows[i][k].toFixed(1)}<small style="font-size:14px">${u}</small></div><div class="diff">${d}</div></div>`;
-  });
+  const rows = sorted(), items = [];
   const since = new Date(); since.setDate(since.getDate() - 29);
   const s = since.toISOString().slice(0, 10);
   const exCount = rows.filter(r => r.exercise && r.date >= s).length;
