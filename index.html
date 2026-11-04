@@ -34,7 +34,10 @@
   .stat .val { font-size: 24px; font-weight: 700; margin-top: 4px; }
   .stat .diff { font-size: 12px; margin-top: 2px; color: var(--sub); }
   form { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; align-items: end; }
-  label { font-size: 12px; color: var(--sub); display: flex; flex-direction: column; gap: 4px; }
+  label { font-size: 12px; color: var(--sub); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  input { min-width: 0; max-width: 100%; }
+  input[type=date] { -webkit-appearance: none; appearance: none; min-height: 39px; text-align: left; display: block; }
+  input[type=date]::-webkit-date-and-time-value { text-align: left; }
   input[type=date], input[type=number], input[type=text] {
     padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 15px;
     background: var(--bg); color: var(--text); width: 100%; }

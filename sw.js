@@ -1,4 +1,4 @@
-﻿const CACHE = 'taiju-v8';
+﻿const CACHE = 'taiju-v9';
 const FILES = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))));
 self.addEventListener('activate', e => e.waitUntil(
