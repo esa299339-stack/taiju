@@ -265,8 +265,8 @@ function drawChart() {
       },
       scales: {
         x: { grid: { display: false }, ticks: { color: tick, maxTicksLimit: big ? 14 : 8 } },
-        y: { grid: { color: grid }, ticks: { color: tick }, grace: '8%', title: { display: true, text: 'kg（体重・筋肉量）', color: tick } },
-        y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: css('--f') }, grace: '8%', title: { display: true, text: '%（体脂肪率）', color: css('--f') } }
+        y: { grid: { color: grid }, ticks: { color: tick, callback: v => v + 'kg' }, grace: '8%' },
+        y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: css('--f'), callback: v => v + '%' }, grace: '8%' }
       }
     }
   });
