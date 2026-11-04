@@ -286,7 +286,7 @@ function drawChart() {
       scales: {
         x: { grid: { display: false }, ticks: { color: tick, maxTicksLimit: big ? 14 : 8 } },
         y: { grid: { color: grid }, ...yW, ticks: { color: css('--w'), stepSize: kgStep, precision: 0, callback: v => Math.round(v) + 'kg' } },
-        y2: { position: 'left', grid: { drawOnChartArea: false }, ...yM, ticks: { color: css('--m'), stepSize: kgStep, precision: 0, callback: v => Math.round(v) + 'kg' } },
+        y2: { display: false, position: 'left', grid: { drawOnChartArea: false }, ...yM, ticks: { color: css('--m'), stepSize: kgStep, precision: 0, callback: v => Math.round(v) + 'kg' } },
         y1: { position: 'right', grid: { drawOnChartArea: false }, ...yF, ticks: { color: css('--f'), stepSize: pctStep, precision: 0, callback: v => Math.round(v) + '%' } }
       }
     }
