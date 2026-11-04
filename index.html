@@ -246,7 +246,7 @@ function drawChart() {
   }
   const labels = rows.map(r => r.date.slice(5).replace('-', '/'));
   const grid = css('--line'), tick = css('--sub');
-  const defs = [['weight', '体重', 'kg', '--w', 'y'], ['fat', '体脂肪率', '%', '--f', 'y1'], ['muscle', '筋肉量', 'kg', '--m', 'y']];
+  const defs = [['weight', '体重', 'kg', '--w', 'y'], ['fat', '体脂肪率', '%', '--f', 'y1'], ['muscle', '筋肉量', 'kg', '--m', 'y2']];
   const datasets = defs.map(([k, name, unit, color, axis]) => ({
     label: name, data: rows.map(r => r[k]), borderColor: css(color), backgroundColor: css(color), unit,
     tension: 0.3, spanGaps: true, pointRadius: rows.length > 60 ? 0 : 3, pointHoverRadius: 6, borderWidth: 2.5, yAxisID: axis
@@ -256,6 +256,19 @@ function drawChart() {
     borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 0, yAxisID: 'y'
   });
   const big = $('chartCard').classList.contains('full');
+  // 1週間・1ヶ月は1kg刻み、それより長い期間は5kg刻み
+  const short = range && range <= 30;
+  const kgStep = short ? 1 : 5, pctStep = short ? 1 : 2;
+  // 目盛りの上下を刻み幅にそろえて自分で決める（自動に任せると範囲が広がりすぎるため）
+  const bounds = (keys, step, extra = []) => {
+    const v = rows.flatMap(r => keys.map(k => r[k])).filter(x => x != null).concat(extra);
+    if (!v.length) return {};
+    const lo = Math.min(...v), hi = Math.max(...v);
+    let min = Math.floor(lo / step) * step, max = Math.ceil(hi / step) * step;
+    if (min === lo) min -= step; if (max === hi) max += step;
+    return { min, max };
+  };
+  const yW = bounds(['weight'], kgStep, settings.goal ? [settings.goal] : []), yM = bounds(['muscle'], kgStep), yF = bounds(['fat'], pctStep);
   charts.forEach(c => c.destroy());
   const c = new Chart($('chart'), {
     type: 'line', data: { labels, datasets }, plugins: [exercisePlugin],
@@ -272,8 +285,9 @@ function drawChart() {
       },
       scales: {
         x: { grid: { display: false }, ticks: { color: tick, maxTicksLimit: big ? 14 : 8 } },
-        y: { grid: { color: grid }, ticks: { color: tick, maxTicksLimit: 7, precision: 0, callback: v => Math.round(v) + 'kg' }, grace: '8%' },
-        y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: css('--f'), maxTicksLimit: 7, stepSize: 1, precision: 0, callback: v => Math.round(v) + '%' }, grace: 1 }
+        y: { grid: { color: grid }, ...yW, ticks: { color: css('--w'), stepSize: kgStep, precision: 0, callback: v => Math.round(v) + 'kg' } },
+        y2: { position: 'left', grid: { drawOnChartArea: false }, ...yM, ticks: { color: css('--m'), stepSize: kgStep, precision: 0, callback: v => Math.round(v) + 'kg' } },
+        y1: { position: 'right', grid: { drawOnChartArea: false }, ...yF, ticks: { color: css('--f'), stepSize: pctStep, precision: 0, callback: v => Math.round(v) + '%' } }
       }
     }
   });
