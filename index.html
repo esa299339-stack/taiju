@@ -272,8 +272,8 @@ function drawChart() {
       },
       scales: {
         x: { grid: { display: false }, ticks: { color: tick, maxTicksLimit: big ? 14 : 8 } },
-        y: { grid: { color: grid }, ticks: { color: tick, callback: v => v + 'kg' }, grace: '8%' },
-        y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: css('--f'), callback: v => v + '%' }, grace: '8%' }
+        y: { grid: { color: grid }, ticks: { color: tick, maxTicksLimit: 7, precision: 0, callback: v => Math.round(v) + 'kg' }, grace: '8%' },
+        y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: css('--f'), maxTicksLimit: 7, stepSize: 1, precision: 0, callback: v => Math.round(v) + '%' }, grace: 1 }
       }
     }
   });
